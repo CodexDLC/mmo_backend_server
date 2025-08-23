@@ -1,0 +1,120 @@
+# docker-compose.yml
+
+volumes:
+  pg_data:
+  redis_data:
+  rabbitmq_data:
+
+networks:
+  backend_network:
+    driver: bridge
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres_service
+    networks: [backend_network]
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes: [ "pg_data:/var/lib/postgresql/data" ]
+    ports: [ "${DB_PORT}:5432" ]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: always
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis_service
+    networks: [backend_network]
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    volumes: [ "redis_data:/data" ]
+    ports: [ "${REDIS_PORT}:6379" ]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq_service
+    networks: [backend_network]
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+      RABBITMQ_DEFAULT_VHOST: core
+    volumes:
+      - "rabbitmq_data:/var/lib/rabbitmq"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity", "-q"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: always
+
+  gateway:
+    build:
+      context: .
+      dockerfile: apps/gateway/Dockerfile
+    container_name: gateway_service
+    networks: [backend_network]
+    environment:
+      CONTAINER_ID: "gateway"
+      LOG_LEVEL: ${LOG_LEVEL}
+      RABBITMQ_DSN: "amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/core"
+      REDIS_URL: "redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/0"
+    # --- ИЗМЕНЕНИЕ 1: Убираем переносы строк ---
+    command: >
+      gunicorn -k uvicorn.workers.UvicornWorker -w 1 -b 0.0.0.0:8000 --access-logfile - --error-logfile - apps.gateway.gateway_main:app
+    ports: ["8000:8000"]
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8000/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: always
+
+  auth_svc:
+    build:
+      context: .
+      dockerfile: apps/auth_svc/Dockerfile
+    container_name: auth_service
+    networks: [backend_network]
+    environment:
+      CONTAINER_ID: "auth_svc"
+      LOG_LEVEL: ${LOG_LEVEL}
+      RABBITMQ_DSN: "amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/core"
+      DATABASE_URL: "postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+      REDIS_URL: "redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/0"
+      DB_SCHEMA: "auth"
+      JWT_SECRET: ${JWT_SECRET}
+      ENV_TYPE: "pytest"
+    # --- ИЗМЕНЕНИЕ 2: Убираем переносы строк ---
+    command: >
+      sh -c "alembic -x schema=auth upgrade head && gunicorn -k uvicorn.workers.UvicornWorker -w 1 -b 0.0.0.0:8001 --access-logfile - --error-logfile - apps.auth_svc.auth_svc_main:app"
+    ports: ["8001:8001"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8001/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: always

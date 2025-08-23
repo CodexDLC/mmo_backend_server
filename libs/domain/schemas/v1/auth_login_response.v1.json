@@ -1,0 +1,29 @@
+{
+  "properties": {
+    "token": {
+      "title": "Token",
+      "type": "string"
+    },
+    "refresh_token": {
+      "title": "Refresh Token",
+      "type": "string"
+    },
+    "expires_in": {
+      "description": "Время жизни токена, сек",
+      "title": "Expires In",
+      "type": "integer"
+    },
+    "account_id": {
+      "title": "Account Id",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "token",
+    "refresh_token",
+    "expires_in",
+    "account_id"
+  ],
+  "title": "ApiLoginResponse",
+  "type": "object"
+}

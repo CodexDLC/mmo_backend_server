@@ -1,0 +1,37 @@
+# FastAPI и веб-сервер
+fastapi
+uvicorn[standard]
+gunicorn
+
+# Работа с .env
+python-dotenv
+
+# Pydantic для моделей данных
+pydantic
+pydantic-settings
+email-validator
+PyJWT[crypto]
+cryptography
+
+# RabbitMQ клиент
+aio-pika
+
+# Для цветных логов (используется в libs/utils/logging_setup.py)
+colorlog
+
+# Работа с базами данных
+SQLAlchemy
+asyncpg
+redis
+alembic
+psycopg2-binary
+bcrypt
+
+
+
+# --- Test Dependencies ---
+pytest
+httpx
+trio
+
+jsonschema

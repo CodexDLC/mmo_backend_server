@@ -1,0 +1,23 @@
+{
+  "properties": {
+    "account_id": {
+      "title": "Account Id",
+      "type": "integer"
+    },
+    "email": {
+      "title": "Email",
+      "type": "string"
+    },
+    "username": {
+      "title": "Username",
+      "type": "string"
+    }
+  },
+  "required": [
+    "account_id",
+    "email",
+    "username"
+  ],
+  "title": "ApiRegisterResponse",
+  "type": "object"
+}
