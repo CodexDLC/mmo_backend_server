@@ -21,10 +21,11 @@ from libs.messaging.rabbitmq_names import Queues, Exchanges
 from libs.utils.logging_setup import app_logger as logger
 
 from apps.gateway.dependencies import (
-    get_message_bus,
-    get_client_connection_manager,
-    get_settings,
+    get_ws_message_bus,
+    get_ws_client_connection_manager,
+    get_ws_settings,
 )
+
 from apps.gateway.config.setting_gateway import GatewaySettings
 
 from libs.domain.dto.ws import WSHelloFrame, WSPongFrame
@@ -62,10 +63,10 @@ async def unified_websocket_endpoint(
     websocket: WebSocket,
     token: str = Depends(get_token_from_ws),
     client_conn_manager: ClientConnectionManager = Depends(
-        get_client_connection_manager
+        get_ws_client_connection_manager
     ),
-    message_bus: IMessageBus = Depends(get_message_bus),
-    settings: GatewaySettings = Depends(get_settings),
+    message_bus: IMessageBus = Depends(get_ws_message_bus),
+    settings: GatewaySettings = Depends(get_ws_settings),
 ):
     await websocket.accept()
     client_addr = f"{getattr(websocket.client, 'host', '0.0.0.0')}:{getattr(websocket.client, 'port', '0')}"
