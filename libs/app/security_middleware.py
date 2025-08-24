@@ -15,10 +15,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         response = await call_next(request)
 
-        # --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
-        # Для страницы документации нужна менее строгая политика
-        if "/docs" in request.url.path or "/redoc" in request.url.path:
-            # Эта политика разрешает загрузку скриптов и стилей, необходимых для Swagger/ReDoc
+        docs_url = getattr(request.app, "docs_url", None)
+        redoc_url = getattr(request.app, "redoc_url", None)
+
+        # Apply a less restrictive policy for documentation pages to allow them to render correctly.
+        if (docs_url and request.url.path == docs_url) or \
+           (redoc_url and request.url.path == redoc_url):
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
                 "script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; "
@@ -26,9 +28,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                 "img-src 'self' data:;"
             )
         else:
-            # Для всех остальных страниц оставляем строгую политику
+            # Apply a strict policy for all other application pages.
             response.headers["Content-Security-Policy"] = "default-src 'none'"
-        # --- КОНЕЦ ИСПРАВЛЕНИЯ ---
 
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
